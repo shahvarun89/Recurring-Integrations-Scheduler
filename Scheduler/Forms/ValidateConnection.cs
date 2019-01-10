@@ -3,6 +3,7 @@
 
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Polly;
 using RecurringIntegrationsScheduler.Common.Helpers;
 using RecurringIntegrationsScheduler.Properties;
 using RecurringIntegrationsScheduler.Settings;
@@ -10,6 +11,7 @@ using System;
 using System.ComponentModel;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -39,7 +41,7 @@ namespace RecurringIntegrationsScheduler.Forms
             var applicationsBindingList = new BindingList<AadApplication>(applications.ToList());
             aadApplicationComboBox.DataSource = applicationsBindingList;
             aadApplicationComboBox.ValueMember = null;
-            aadApplicationComboBox.DisplayMember = Resources.Name;
+            aadApplicationComboBox.DisplayMember = "Name";
         }
 
         private void ValidateButton_Click(object sender, EventArgs e)
@@ -74,7 +76,7 @@ namespace RecurringIntegrationsScheduler.Forms
             if (Instance != null)
             {
                 settings.AadTenant = Instance.AadTenant;
-                settings.AosUri = Instance.AosUri.TrimEnd('/'); ;
+                settings.AosUri = Instance.AosUri.TrimEnd('/');
                 settings.AzureAuthEndpoint = Instance.AzureAuthEndpoint;
             }
             if (user != null)
@@ -84,7 +86,8 @@ namespace RecurringIntegrationsScheduler.Forms
             }
             settings.UseServiceAuthentication = serviceAuthRadioButton.Checked;
 
-            var httpClientHelper = new HttpClientHelper(settings);
+            var retryPolicy = Policy.Handle<HttpRequestException>().RetryAsync(retryCount: 1);
+            var httpClientHelper = new HttpClientHelper(settings, retryPolicy);
 
             try
             {
@@ -137,17 +140,41 @@ namespace RecurringIntegrationsScheduler.Forms
                     return result;
                 });
                 checkPackageApi.Wait();
-
-                var blobInfo = (JObject)JsonConvert.DeserializeObject(checkPackageApi.Result);
-                var blobId = blobInfo["BlobId"].ToString();
-
-                if(!String.IsNullOrEmpty(blobId))
+                if (string.IsNullOrEmpty(checkPackageApi.Result))
                 {
-                    messagesTextBox.Text += Resources.D365FO_instance_seems_to_support_package_API + Environment.NewLine;
+                    messagesTextBox.Text += Resources.GetAzureWriteUrl_returned_empty_string_Check_previous_errors;
                 }
                 else
                 {
-                    messagesTextBox.Text += Resources.D365FO_instance_seems_to_not_support_package_API + Environment.NewLine;
+                    var blobInfo = (JObject)JsonConvert.DeserializeObject(checkPackageApi.Result);
+                    var blobId = blobInfo["BlobId"].ToString();
+
+                    if (!string.IsNullOrEmpty(blobId))
+                    {
+                        messagesTextBox.Text += Resources.D365FO_instance_seems_to_support_package_API + Environment.NewLine;
+                    }
+                    else
+                    {
+                        messagesTextBox.Text += Resources.D365FO_instance_seems_to_not_support_package_API + Environment.NewLine;
+                        return; //we should not check further.
+                    }
+                }
+
+                var checkKb4058074 = Task.Run(async () =>
+                {
+                    var result = await httpClientHelper.GetMessageStatus(new Guid().ToString());
+                    return result;
+                });
+                checkKb4058074.Wait();
+                if (string.IsNullOrEmpty(checkKb4058074.Result))
+                {
+                    //TODO
+                    messagesTextBox.Text += Resources.Method_GetMessageStatus_returned_empty_string_KB4058074_is_not_installed + Environment.NewLine;
+                }
+                else
+                {
+                    //TODO
+                    messagesTextBox.Text += Resources.Instance_seems_to_support_GetMessageStatus_method + Environment.NewLine;
                 }
             }
             catch (Exception ex)
@@ -174,7 +201,7 @@ namespace RecurringIntegrationsScheduler.Forms
             var applicationsBindingList = new BindingList<AadApplication>(applications.ToList());
             aadApplicationComboBox.DataSource = applicationsBindingList;
             aadApplicationComboBox.ValueMember = null;
-            aadApplicationComboBox.DisplayMember = Resources.Name;
+            aadApplicationComboBox.DisplayMember = "Name";
 
             userComboBox.Enabled = !serviceAuthRadioButton.Checked;
         }

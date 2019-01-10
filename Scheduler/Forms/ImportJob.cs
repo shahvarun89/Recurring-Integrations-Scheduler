@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -42,6 +43,11 @@ namespace RecurringIntegrationsScheduler.Forms
         public IJobDetail ExecutionJobDetail { get; set; }
         public ITrigger ExecutionTrigger { get; set; }
 
+        private string importFromPackagePath;
+        private string getAzureWriteUrlPath;
+        private string getExecutionSummaryStatusPath;
+        private string getExecutionSummaryPageUrlPath;
+
         private void ImportJobForm_Load(object sender, EventArgs e)
         {
             Cancelled = false;
@@ -54,19 +60,19 @@ namespace RecurringIntegrationsScheduler.Forms
 
             jobGroupComboBox.DataSource = Properties.Settings.Default.JobGroups;
             jobGroupComboBox.ValueMember = null;
-            jobGroupComboBox.DisplayMember = Resources.Name;
+            jobGroupComboBox.DisplayMember = "Name";
 
             jobGroupComboBox.Enabled = ImportJobDetail == null;
 
             instanceComboBox.DataSource = Properties.Settings.Default.Instances;
             instanceComboBox.ValueMember = null;
-            instanceComboBox.DisplayMember = Resources.Name;
+            instanceComboBox.DisplayMember = "Name";
 
             var applications = Properties.Settings.Default.AadApplications.Where(x => x.AuthenticationType == AuthenticationType.User);
             var applicationsBindingList = new BindingList<AadApplication>(applications.ToList());
             aadApplicationComboBox.DataSource = applicationsBindingList;
             aadApplicationComboBox.ValueMember = null;
-            aadApplicationComboBox.DisplayMember = Resources.Name;
+            aadApplicationComboBox.DisplayMember = "Name";
 
             userComboBox.DataSource = Properties.Settings.Default.Users;
             userComboBox.ValueMember = null;
@@ -83,7 +89,12 @@ namespace RecurringIntegrationsScheduler.Forms
             processingSuccessFolderTextBox.Text = Properties.Settings.Default.ProcessingSuccessFolder;
             processingErrorsFolderTextBox.Text = Properties.Settings.Default.ProcessingErrorsFolder;
 
-            if ((ImportJobDetail != null) && (ImportJobDetail != null))
+            importFromPackagePath = OdataActionsConstants.ImportFromPackageActionPath;
+            getAzureWriteUrlPath = OdataActionsConstants.GetAzureWriteUrlActionPath;
+            getExecutionSummaryStatusPath = OdataActionsConstants.GetExecutionSummaryStatusActionPath;
+            getExecutionSummaryPageUrlPath = OdataActionsConstants.GetExecutionSummaryPageUrlActionPath;
+
+            if (ImportJobDetail != null)
             {
                 jobName.Text = ImportJobDetail.Key.Name;
 
@@ -165,7 +176,7 @@ namespace RecurringIntegrationsScheduler.Forms
                         applicationsBindingList = new BindingList<AadApplication>(applications.ToList());
                         aadApplicationComboBox.DataSource = applicationsBindingList;
                         aadApplicationComboBox.ValueMember = null;
-                        aadApplicationComboBox.DisplayMember = Resources.Name;
+                        aadApplicationComboBox.DisplayMember = "Name";
                     }
                     else
                     {
@@ -216,6 +227,10 @@ namespace RecurringIntegrationsScheduler.Forms
                                                          ImportJobDetail.JobDataMap[SettingsConstants.ReverseOrder]
                                                              .ToString());
 
+                pauseIndefinitelyCheckBox.Checked =
+                    (ImportJobDetail.JobDataMap[SettingsConstants.IndefinitePause] != null) &&
+                    Convert.ToBoolean(ImportJobDetail.JobDataMap[SettingsConstants.IndefinitePause].ToString());
+
                 if (ImportTrigger.GetType() == typeof(SimpleTriggerImpl))
                 {
                     var localTrigger = (SimpleTriggerImpl) ImportTrigger;
@@ -229,6 +244,21 @@ namespace RecurringIntegrationsScheduler.Forms
                     upJobCronTriggerRadioButton.Checked = true;
                     upJobCronExpressionTextBox.Text = localTrigger.CronExpressionString;
                 }
+                if(ImportJobDetail.JobDataMap[SettingsConstants.RetryCount] != null)
+                {
+                    retriesCountUpDown.Value = Convert.ToDecimal(ImportJobDetail.JobDataMap[SettingsConstants.RetryCount]);
+                }
+                if(ImportJobDetail.JobDataMap[SettingsConstants.RetryDelay] != null)
+                {
+                    retriesDelayUpDown.Value = Convert.ToDecimal(ImportJobDetail.JobDataMap[SettingsConstants.RetryDelay]);
+                }
+                pauseOnExceptionsCheckBox.Checked =
+                    (ImportJobDetail.JobDataMap[SettingsConstants.PauseJobOnException] != null) &&
+                    Convert.ToBoolean(ImportJobDetail.JobDataMap[SettingsConstants.PauseJobOnException].ToString());
+
+                importFromPackagePath = ImportJobDetail.JobDataMap[SettingsConstants.ImportFromPackageActionPath]?.ToString() ?? OdataActionsConstants.ImportFromPackageActionPath;
+                getAzureWriteUrlPath = ImportJobDetail.JobDataMap[SettingsConstants.GetAzureWriteUrlActionPath]?.ToString() ?? OdataActionsConstants.GetAzureWriteUrlActionPath;
+
                 Properties.Settings.Default.Save();
             }
             if ((ExecutionJobDetail != null) && (ExecutionTrigger != null))
@@ -252,6 +282,9 @@ namespace RecurringIntegrationsScheduler.Forms
                     procJobCronTriggerRadioButton.Checked = true;
                     procJobCronExpressionTextBox.Text = localTrigger.CronExpressionString;
                 }
+
+                getExecutionSummaryStatusPath = ExecutionJobDetail.JobDataMap[SettingsConstants.GetExecutionSummaryStatusActionPath]?.ToString() ?? OdataActionsConstants.GetExecutionSummaryStatusActionPath;
+                getExecutionSummaryPageUrlPath = ExecutionJobDetail.JobDataMap[SettingsConstants.GetExecutionSummaryPageUrlActionPath]?.ToString() ?? OdataActionsConstants.GetExecutionSummaryPageUrlActionPath;
             }
         }
 
@@ -343,30 +376,6 @@ namespace RecurringIntegrationsScheduler.Forms
             upJobStartAtDateTimePicker.Enabled = !upJobCronTriggerRadioButton.Checked;
             upJobCronExpressionTextBox.Enabled = upJobCronTriggerRadioButton.Checked;
             getCronScheduleForUploadButton.Enabled = upJobCronTriggerRadioButton.Checked;
-        }
-
-        private void AddJobButton_Click(object sender, EventArgs e)
-        {
-            if (ImportJobDetail == null)
-            {
-                var jobKey = new JobKey(jobName.Text, jobGroupComboBox.Text);
-                if (Scheduler.Instance.GetScheduler().CheckExists(jobKey))
-                    if (
-                        MessageBox.Show(
-                            string.Format(Resources.Job_0_in_group_1_already_exists, jobKey.Name, jobKey.Group),
-                            Resources.Job_already_exists, MessageBoxButtons.YesNo) == DialogResult.No)
-                        return;
-            }
-
-            if (!ValidateJobSettings()) return;
-            ImportJobDetail = GetImportJobDetail();
-            ImportTrigger = GetImportTrigger(ImportJobDetail);
-            if (useMonitoringJobCheckBox.Checked)
-            {
-                ExecutionJobDetail = GetMonitorJobDetail();
-                ExecutionTrigger = GetExecutionTrigger(ExecutionJobDetail);
-            }
-            Close();
         }
 
         private bool ValidateJobSettings()
@@ -551,7 +560,13 @@ namespace RecurringIntegrationsScheduler.Forms
                 {SettingsConstants.ExecuteImport, executeImportCheckBox.Checked.ToString()},
                 {SettingsConstants.OverwriteDataProject, overwriteDataProjectCheckBox.Checked.ToString()},
                 {SettingsConstants.DataProject, dataProject.Text},
-                {SettingsConstants.PackageTemplate, packageTemplateTextBox.Text}
+                {SettingsConstants.PackageTemplate, packageTemplateTextBox.Text},
+                {SettingsConstants.RetryCount, retriesCountUpDown.Value.ToString(CultureInfo.InvariantCulture)},
+                {SettingsConstants.RetryDelay, retriesDelayUpDown.Value.ToString(CultureInfo.InvariantCulture)},
+                {SettingsConstants.PauseJobOnException, pauseOnExceptionsCheckBox.Checked.ToString()},
+                {SettingsConstants.GetAzureWriteUrlActionPath, getAzureWriteUrlPath},
+                {SettingsConstants.ImportFromPackageActionPath, importFromPackagePath},
+                {SettingsConstants.IndefinitePause, pauseIndefinitelyCheckBox.Checked.ToString()}
             };
             if (serviceAuthRadioButton.Checked)
             {
@@ -581,7 +596,13 @@ namespace RecurringIntegrationsScheduler.Forms
                 {SettingsConstants.AzureAuthEndpoint, instance.AzureAuthEndpoint},
                 {SettingsConstants.AosUri, instance.AosUri},
                 {SettingsConstants.AadClientId, application.ClientId},
-                {SettingsConstants.UseServiceAuthentication, serviceAuthRadioButton.Checked.ToString()}
+                {SettingsConstants.UseServiceAuthentication, serviceAuthRadioButton.Checked.ToString()},
+                {SettingsConstants.RetryCount, retriesCountUpDown.Value.ToString(CultureInfo.InvariantCulture)},
+                {SettingsConstants.RetryDelay, retriesDelayUpDown.Value.ToString(CultureInfo.InvariantCulture)},
+                {SettingsConstants.PauseJobOnException, pauseOnExceptionsCheckBox.Checked.ToString()},
+                {SettingsConstants.GetExecutionSummaryStatusActionPath, getExecutionSummaryStatusPath},
+                {SettingsConstants.GetExecutionSummaryPageUrlActionPath, getExecutionSummaryPageUrlPath},
+                {SettingsConstants.IndefinitePause, pauseIndefinitelyCheckBox.Checked.ToString()}
             };
             if (serviceAuthRadioButton.Checked)
             {
@@ -667,12 +688,6 @@ namespace RecurringIntegrationsScheduler.Forms
         {
             var form = new CronExamples();
             form.ShowDialog();
-        }
-
-        private void CancelButton_Click(object sender, EventArgs e)
-        {
-            Cancelled = true;
-            Close();
         }
 
         private void UseMonitoringJobCheckBox_CheckedChanged(object sender, EventArgs e)
@@ -763,7 +778,7 @@ namespace RecurringIntegrationsScheduler.Forms
             var applicationsBindingList = new BindingList<AadApplication>(applications.ToList());
             aadApplicationComboBox.DataSource = applicationsBindingList;
             aadApplicationComboBox.ValueMember = null;
-            aadApplicationComboBox.DisplayMember = Resources.Name;
+            aadApplicationComboBox.DisplayMember = "Name";
 
             userComboBox.Enabled = !serviceAuthRadioButton.Checked;
         }
@@ -772,6 +787,62 @@ namespace RecurringIntegrationsScheduler.Forms
         {
             if (openFileDialog.ShowDialog() == DialogResult.OK)
                 packageTemplateTextBox.Text = openFileDialog.FileName;
+        }
+
+        private void CustomActionsButton_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (ImportJobOptions form = new ImportJobOptions())
+                {
+                    form.GetAzureWriteUrlPath = getAzureWriteUrlPath;
+                    form.ImportFromPackagePath = importFromPackagePath;
+                    form.GetExecutionSummaryStatusPath = getExecutionSummaryStatusPath;
+                    form.GetExecutionSummaryPageUrlPath = getExecutionSummaryPageUrlPath;
+                    form.ShowDialog();
+
+                    if (form.Cancelled) return;
+
+                    getAzureWriteUrlPath = form.GetAzureWriteUrlPath;
+                    importFromPackagePath = form.ImportFromPackagePath;
+                    getExecutionSummaryStatusPath = form.GetExecutionSummaryStatusPath;
+                    getExecutionSummaryPageUrlPath = form.GetExecutionSummaryPageUrlPath;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, Resources.Unexpected_error);
+            }
+        }
+
+        private void AddJobButton_Click(object sender, EventArgs e)
+        {
+            if (ImportJobDetail == null)
+            {
+                var jobKey = new JobKey(jobName.Text, jobGroupComboBox.Text);
+                if (Scheduler.Instance.GetScheduler().CheckExists(jobKey).Result)
+                    if (
+                        MessageBox.Show(
+                            string.Format(Resources.Job_0_in_group_1_already_exists, jobKey.Name, jobKey.Group),
+                            Resources.Job_already_exists, MessageBoxButtons.YesNo) == DialogResult.No)
+                        return;
+            }
+
+            if (!ValidateJobSettings()) return;
+            ImportJobDetail = GetImportJobDetail();
+            ImportTrigger = GetImportTrigger(ImportJobDetail);
+            if (useMonitoringJobCheckBox.Checked)
+            {
+                ExecutionJobDetail = GetMonitorJobDetail();
+                ExecutionTrigger = GetExecutionTrigger(ExecutionJobDetail);
+            }
+            Close();
+        }
+
+        private void CancelButton_Click(object sender, EventArgs e)
+        {
+            Cancelled = true;
+            Close();
         }
     }
 }

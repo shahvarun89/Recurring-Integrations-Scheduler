@@ -36,15 +36,14 @@ Name: Scheduler; Description: Recurring Integrations Scheduler Service; Types: f
 [Files]
 ; Quartz
 Source: "..\Output\Release\Quartz.dll"; DestDir: "{app}"; Flags: ignoreversion; Components: App Scheduler
-Source: "..\Output\Release\Common.Logging.Core.dll"; DestDir: "{app}"; Flags: ignoreversion; Components: App Scheduler
-Source: "..\Output\Release\Common.Logging.dll"; DestDir: "{app}"; Flags: ignoreversion; Components: App Scheduler
-Source: "..\Output\Release\Common.Logging.Log4Net1213.dll"; DestDir: "{app}"; Flags: ignoreversion; Components: App Scheduler
 Source: "..\Output\Release\log4net.dll"; DestDir: "{app}"; Flags: ignoreversion; Components: App Scheduler
+Source: ".\Quartz.Plugins.dll"; DestDir: "{app}"; Flags: ignoreversion; Components: App Scheduler
+Source: ".\Quartz.Jobs.dll"; DestDir: "{app}"; Flags: ignoreversion; Components: App Scheduler
+Source: ".\Quartz.Serialization.Json.dll"; DestDir: "{app}"; Flags: ignoreversion; Components: App Scheduler
 Source: ".\Quartz.Server.exe"; DestDir: "{app}"; Flags: ignoreversion; Components: Scheduler
 Source: ".\Topshelf.dll"; DestDir: "{app}"; Flags: ignoreversion; Components: Scheduler
 ; Common
 Source: "..\Output\Release\RecurringIntegrationsScheduler.Common.dll"; DestDir: "{app}"; Flags: ignoreversion; Components: App Scheduler
-Source: "..\Output\Release\RecurringIntegrationsScheduler.Common.dll.config"; DestDir: "{app}"; Flags: ignoreversion; Components: App Scheduler
 ; Jobs
 Source: "..\Output\Release\RecurringIntegrationsScheduler.Job.Upload.dll"; DestDir: "{app}"; Flags: ignoreversion; Components: App Scheduler
 Source: "..\Output\Release\RecurringIntegrationsScheduler.Job.ProcessingMonitor.dll"; DestDir: "{app}"; Flags: ignoreversion; Components: App Scheduler
@@ -54,11 +53,12 @@ Source: "..\Output\Release\RecurringIntegrationsScheduler.Job.Export.dll"; DestD
 Source: "..\Output\Release\RecurringIntegrationsScheduler.Job.ExecutionMonitor.dll"; DestDir: "{app}"; Flags: ignoreversion; Components: App Scheduler
 ; References
 Source: "..\Output\Release\Microsoft.IdentityModel.Clients.ActiveDirectory.dll"; DestDir: "{app}"; Flags: ignoreversion; Components: App Scheduler
-Source: "..\Output\Release\Microsoft.IdentityModel.Clients.ActiveDirectory.Platform.dll"; DestDir: "{app}"; Flags: ignoreversion; Components: App Scheduler
 Source: "..\Output\Release\Newtonsoft.Json.dll"; DestDir: "{app}"; Flags: ignoreversion; Components: App Scheduler
 Source: "..\Output\Release\System.Linq.Dynamic.dll"; DestDir: "{app}"; Flags: ignoreversion; Components: App Scheduler
+Source: "..\Output\Release\Polly.dll"; DestDir: "{app}"; Flags: ignoreversion; Components: App Scheduler
+Source: "..\Output\Release\PortableSettingsProvider.dll"; DestDir: "{app}"; Flags: ignoreversion; Components: App Scheduler
+
 ; App
-Source: "..\Output\Release\RecurringIntegrationsScheduler.exe"; DestDir: "{app}"; Flags: ignoreversion; Components: App
 Source: "..\Output\Release\RecurringIntegrationsScheduler.exe"; DestDir: "{app}"; Flags: ignoreversion; Components: App
 Source: "..\Output\Release\RecurringIntegrationsScheduler.exe.config"; DestDir: "{app}"; Flags: ignoreversion; Components: App
 
@@ -76,7 +76,6 @@ Root: HKLM; Subkey: "System\CurrentControlSet\Services\EventLog\Recurring Integr
 [Icons]
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 Name: "{group}\Recurring Integrations Scheduler App"; Filename: "{app}\RecurringIntegrationsScheduler.exe"; WorkingDir: "{app}"
-Name: "{group}\Recurring Integrations Scheduler White Paper"; Filename: "{app}\Recurring Integrations Scheduler.pdf"; WorkingDir: "{app}"
 
 [Run]
 Filename: "{app}\Quartz.Server.exe"; Parameters: "install"; Flags: runhidden; Components: Scheduler

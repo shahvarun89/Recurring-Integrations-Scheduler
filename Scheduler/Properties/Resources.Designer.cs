@@ -629,6 +629,17 @@ namespace RecurringIntegrationsScheduler.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to With cron expression you can specify schedules such as “every Friday at noon”, or “every weekday and 9:30 am”, or even “every 5 minutes between 9:00 am and 10:00 am on every Monday, Wednesday and Friday during January”.
+        ///
+        ///Default example above means: Each working day of the week (MON-FRI) run every 15 minutes (0/15) between 8:00 and 18:45 (8-18 - last run will be at 18:45).
+        /// </summary>
+        internal static string cronTriggerInfo {
+            get {
+                return ResourceManager.GetString("cronTriggerInfo", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to D365FO instance seems to be up and running..
         /// </summary>
         internal static string D365FO_instance_seems_to_be_up_and_running {
@@ -1108,6 +1119,15 @@ namespace RecurringIntegrationsScheduler.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Method GetAzureWriteUrl returned empty string. Check previous errors..
+        /// </summary>
+        internal static string GetAzureWriteUrl_returned_empty_string_Check_previous_errors {
+            get {
+                return ResourceManager.GetString("GetAzureWriteUrl_returned_empty_string_Check_previous_errors", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Group.
         /// </summary>
         internal static string Group {
@@ -1203,6 +1223,15 @@ namespace RecurringIntegrationsScheduler.Properties {
         internal static string Instance_name_ {
             get {
                 return ResourceManager.GetString("Instance_name_", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Instance seems to support GetMessageStatus method.
+        /// </summary>
+        internal static string Instance_seems_to_support_GetMessageStatus_method {
+            get {
+                return ResourceManager.GetString("Instance_seems_to_support_GetMessageStatus_method", resourceCulture);
             }
         }
         
@@ -1378,6 +1407,15 @@ namespace RecurringIntegrationsScheduler.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Method GetMessageStatus returned empty string. KB4058074 is not installed..
+        /// </summary>
+        internal static string Method_GetMessageStatus_returned_empty_string_KB4058074_is_not_installed {
+            get {
+                return ResourceManager.GetString("Method_GetMessageStatus_returned_empty_string_KB4058074_is_not_installed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Missing scheduler.
         /// </summary>
         internal static string Missing_scheduler {
@@ -1407,9 +1445,9 @@ namespace RecurringIntegrationsScheduler.Properties {
         /// <summary>
         ///   Looks up a localized string similar to Name.
         /// </summary>
-        internal static string Name {
+        internal static string NameLabel {
             get {
-                return ResourceManager.GetString("Name", resourceCulture);
+                return ResourceManager.GetString("NameLabel", resourceCulture);
             }
         }
         

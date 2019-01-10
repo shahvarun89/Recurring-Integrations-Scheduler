@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -52,25 +53,25 @@ namespace RecurringIntegrationsScheduler.Forms
 
             jobGroupComboBox.DataSource = Properties.Settings.Default.JobGroups;
             jobGroupComboBox.ValueMember = null;
-            jobGroupComboBox.DisplayMember = Resources.Name;
+            jobGroupComboBox.DisplayMember = "Name";
 
             jobGroupComboBox.Enabled = JobDetail == null;
 
             instanceComboBox.DataSource = Properties.Settings.Default.Instances;
             instanceComboBox.ValueMember = null;
-            instanceComboBox.DisplayMember = Resources.Name;
+            instanceComboBox.DisplayMember = "Name";
 
             var dataJobs = Properties.Settings.Default.DataJobs.Where(x => x.Type == DataJobType.Download);
             var dataJobsBindingList = new BindingList<DataJob>(dataJobs.ToList());
             dataJobComboBox.DataSource = dataJobsBindingList;
             dataJobComboBox.ValueMember = null;
-            dataJobComboBox.DisplayMember = Resources.Name;
+            dataJobComboBox.DisplayMember = "Name";
 
             var applications = Properties.Settings.Default.AadApplications.Where(x => x.AuthenticationType == AuthenticationType.User);
             var applicationsBindingList = new BindingList<AadApplication>(applications.ToList());
             aadApplicationComboBox.DataSource = applicationsBindingList;
             aadApplicationComboBox.ValueMember = null;
-            aadApplicationComboBox.DisplayMember = Resources.Name;
+            aadApplicationComboBox.DisplayMember = "Name";
 
             userComboBox.DataSource = Properties.Settings.Default.Users;
             userComboBox.ValueMember = null;
@@ -152,7 +153,7 @@ namespace RecurringIntegrationsScheduler.Forms
                         applicationsBindingList = new BindingList<AadApplication>(applications.ToList());
                         aadApplicationComboBox.DataSource = applicationsBindingList;
                         aadApplicationComboBox.ValueMember = null;
-                        aadApplicationComboBox.DisplayMember = Resources.Name;
+                        aadApplicationComboBox.DisplayMember = "Name";
                     }
                     else
                     {
@@ -186,7 +187,7 @@ namespace RecurringIntegrationsScheduler.Forms
                     dataJobsBindingList = new BindingList<DataJob>(dataJobs.ToList());
                     dataJobComboBox.DataSource = dataJobsBindingList;
                     dataJobComboBox.ValueMember = null;
-                    dataJobComboBox.DisplayMember = Resources.Name;
+                    dataJobComboBox.DisplayMember = "Name";
                 }
                 dataJobComboBox.SelectedItem = dataJob;
 
@@ -207,6 +208,10 @@ namespace RecurringIntegrationsScheduler.Forms
                 }
                 instanceComboBox.SelectedItem = axInstance;
 
+                pauseIndefinitelyCheckBox.Checked =
+                    (JobDetail.JobDataMap[SettingsConstants.IndefinitePause] != null) &&
+                    Convert.ToBoolean(JobDetail.JobDataMap[SettingsConstants.IndefinitePause].ToString());
+
                 if (Trigger.GetType() == typeof(SimpleTriggerImpl))
                 {
                     var localTrigger = (SimpleTriggerImpl) Trigger;
@@ -220,6 +225,18 @@ namespace RecurringIntegrationsScheduler.Forms
                     cronTriggerRadioButton.Checked = true;
                     cronExpressionTextBox.Text = localTrigger.CronExpressionString;
                 }
+                if(JobDetail.JobDataMap[SettingsConstants.RetryCount] != null)
+                {
+                    retriesCountUpDown.Value = Convert.ToDecimal(JobDetail.JobDataMap[SettingsConstants.RetryCount]);
+                }
+                if(JobDetail.JobDataMap[SettingsConstants.RetryDelay] != null)
+                {
+                    retriesDelayUpDown.Value = Convert.ToDecimal(JobDetail.JobDataMap[SettingsConstants.RetryDelay]);
+                }
+                pauseOnExceptionsCheckBox.Checked =
+                    (JobDetail.JobDataMap[SettingsConstants.PauseJobOnException] != null) &&
+                    Convert.ToBoolean(JobDetail.JobDataMap[SettingsConstants.PauseJobOnException].ToString());
+
                 Properties.Settings.Default.Save();
             }
         }
@@ -271,7 +288,7 @@ namespace RecurringIntegrationsScheduler.Forms
             if (JobDetail == null)
             {
                 var jobKey = new JobKey(jobName.Text, jobGroupComboBox.Text);
-                if (Scheduler.Instance.GetScheduler().CheckExists(jobKey))
+                if (Scheduler.Instance.GetScheduler().CheckExists(jobKey).Result)
                     if (
                         MessageBox.Show(
                             string.Format(Resources.Job_0_in_group_1_already_exists, jobKey.Name, jobKey.Group),
@@ -388,7 +405,11 @@ namespace RecurringIntegrationsScheduler.Forms
                 {SettingsConstants.AadClientId, application.ClientId},
                 {SettingsConstants.UnzipPackage, unzipCheckBox.Checked.ToString()},
                 {SettingsConstants.AddTimestamp, addTimestampCheckBox.Checked.ToString()},
-                {SettingsConstants.DeletePackage, deletePackageCheckBox.Checked.ToString()}
+                {SettingsConstants.DeletePackage, deletePackageCheckBox.Checked.ToString()},
+                {SettingsConstants.RetryCount, retriesCountUpDown.Value.ToString(CultureInfo.InvariantCulture)},
+                {SettingsConstants.RetryDelay, retriesDelayUpDown.Value.ToString(CultureInfo.InvariantCulture)},
+                {SettingsConstants.PauseJobOnException, pauseOnExceptionsCheckBox.Checked.ToString()},
+                {SettingsConstants.IndefinitePause, pauseIndefinitelyCheckBox.Checked.ToString()}
             };
             if (serviceAuthRadioButton.Checked)
             {
@@ -489,7 +510,7 @@ namespace RecurringIntegrationsScheduler.Forms
             var applicationsBindingList = new BindingList<AadApplication>(applications.ToList());
             aadApplicationComboBox.DataSource = applicationsBindingList;
             aadApplicationComboBox.ValueMember = null;
-            aadApplicationComboBox.DisplayMember = Resources.Name;
+            aadApplicationComboBox.DisplayMember = "Name";
 
             userComboBox.Enabled = !serviceAuthRadioButton.Checked;
         }

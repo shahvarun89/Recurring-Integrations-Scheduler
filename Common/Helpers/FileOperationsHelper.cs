@@ -1,17 +1,16 @@
 ﻿/* Copyright (c) Microsoft Corporation. All rights reserved.
    Licensed under the MIT License. */
 
+using System;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using RecurringIntegrationsScheduler.Common.Contracts;
 using RecurringIntegrationsScheduler.Common.Properties;
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Text;
-using System.Threading;
 
 namespace RecurringIntegrationsScheduler.Common.Helpers
 {
@@ -22,26 +21,12 @@ namespace RecurringIntegrationsScheduler.Common.Helpers
         /// </summary>
         /// <param name="filePath">File path</param>
         /// <returns>Boolean with operation result</returns>
-        public static bool Delete(string filePath)
+        public static void Delete(string filePath)
         {
-            for (int i = 1; i <= Properties.Settings.Default.NumberOfRetries; ++i)
+            if (File.Exists(filePath))
             {
-                try
-                {
-                    if (File.Exists(filePath))
-                        File.Delete(filePath);
-
-                    return true;
-                }
-                catch
-                {
-                    if (i == Properties.Settings.Default.NumberOfRetries)
-                        throw;
-
-                    Thread.Sleep(Properties.Settings.Default.DelayOnRetry);
-                }
+                File.Delete(filePath);
             }
-            return false;
         }
 
         /// <summary>
@@ -51,29 +36,17 @@ namespace RecurringIntegrationsScheduler.Common.Helpers
         /// <returns>Stream</returns>
         public static Stream Read(string filePath)
         {
-            for (int i = 1; i <= Properties.Settings.Default.NumberOfRetries; ++i)
+            if (File.Exists(filePath))
             {
-                try
-                {
-                    if (File.Exists(filePath))
-                        return new FileStream(filePath,
-                            FileMode.Open,
-                            FileAccess.ReadWrite,
-                            FileShare.ReadWrite,
-                            Properties.Settings.Default.BufferSize,
-                            true);
-                    return null;
-                }
-                catch
-                {
-                    if (i == Properties.Settings.Default.NumberOfRetries)
-                        throw;
-
-                    Thread.Sleep(Properties.Settings.Default.DelayOnRetry);
-                }
+                return new FileStream(filePath,
+                    FileMode.Open,
+                    FileAccess.ReadWrite,
+                    FileShare.ReadWrite,
+                    4096,
+                    true);
             }
             return null;
-        }
+         }
 
         /// <summary>
         /// Creates a file
@@ -81,33 +54,18 @@ namespace RecurringIntegrationsScheduler.Common.Helpers
         /// <param name="sourceStream">Source stream</param>
         /// <param name="filePath">Target file path</param>
         /// <returns>Boolean with operation result</returns>
-        public static bool Create(Stream sourceStream, string filePath)
+        public static void Create(Stream sourceStream, string filePath)
         {
-            for (int i = 1; i <= Properties.Settings.Default.NumberOfRetries; ++i)
+            var targetDirectoryName = Path.GetDirectoryName(filePath);
+            if (targetDirectoryName == null)
+                throw new DirectoryNotFoundException();
+
+            Directory.CreateDirectory(targetDirectoryName);
+            using (var fileStream = File.Create(filePath))
             {
-                try
-                {
-                    var targetDirectoryName = Path.GetDirectoryName(filePath);
-                    if (targetDirectoryName == null)
-                        throw new DirectoryNotFoundException();
-
-                    Directory.CreateDirectory(targetDirectoryName);
-                    using (var fileStream = File.Create(filePath))
-                    {
-                        sourceStream.Seek(0, SeekOrigin.Begin);
-                        sourceStream.CopyTo(fileStream);
-                    }
-                    return true;
-                }
-                catch
-                {
-                    if (i == Properties.Settings.Default.NumberOfRetries)
-                        throw;
-
-                    Thread.Sleep(Properties.Settings.Default.DelayOnRetry);
-                }
+                sourceStream.Seek(0, SeekOrigin.Begin);
+                sourceStream.CopyTo(fileStream);
             }
-            return false;
         }
 
         /// <summary>
@@ -229,7 +187,7 @@ namespace RecurringIntegrationsScheduler.Common.Helpers
         /// <param name="deletePackage">Flag whether to delete zip file</param>
         /// <param name="addTimestamp">Flag whether to add timestamp to extracted file name</param>
         /// <returns>Boolean with operation result</returns>
-        public static bool UnzipPackage(string filePath, bool deletePackage, bool addTimestamp = false)
+        public static void UnzipPackage(string filePath, bool deletePackage, bool addTimestamp = false)
         {
             if (File.Exists(filePath))
             {
@@ -245,10 +203,10 @@ namespace RecurringIntegrationsScheduler.Common.Helpers
 
                         if (addTimestamp)
                             fileName =
-                                Path.Combine(Path.GetDirectoryName(filePath),
-                                    Path.GetFileNameWithoutExtension(filePath)) + "-" + entry.FullName;
+                                Path.Combine(Path.GetDirectoryName(filePath) ?? throw new InvalidOperationException(),
+                                    Path.GetFileNameWithoutExtension(filePath) ?? throw new InvalidOperationException()) + "-" + entry.FullName;
                         else
-                            fileName = Path.Combine(Path.GetDirectoryName(filePath), entry.FullName);
+                            fileName = Path.Combine(Path.GetDirectoryName(filePath) ?? throw new InvalidOperationException(), entry.FullName);
 
                         entry.ExtractToFile(fileName, !addTimestamp);
                     }
@@ -256,7 +214,6 @@ namespace RecurringIntegrationsScheduler.Common.Helpers
                 if (deletePackage)
                     File.Delete(filePath);
             }
-            return true;
         }
 
         /// <summary>
@@ -273,13 +230,13 @@ namespace RecurringIntegrationsScheduler.Common.Helpers
             //Now status file
             if (!deleteStatusFile)
             {
-                var sourceStatusFile = Path.Combine(Path.GetDirectoryName(sourceFilePath), Path.GetFileNameWithoutExtension(sourceFilePath) + statusFileExtension);
-                var targetStatusFile = Path.Combine(Path.GetDirectoryName(targetFilePath), Path.GetFileNameWithoutExtension(targetFilePath) + statusFileExtension);
+                var sourceStatusFile = Path.Combine(Path.GetDirectoryName(sourceFilePath) ?? throw new InvalidOperationException(), Path.GetFileNameWithoutExtension(sourceFilePath) + statusFileExtension);
+                var targetStatusFile = Path.Combine(Path.GetDirectoryName(targetFilePath) ?? throw new InvalidOperationException(), Path.GetFileNameWithoutExtension(targetFilePath) + statusFileExtension);
                 Move(sourceStatusFile, targetStatusFile);
             }
             else
             {
-                var sourceStatusFile = Path.Combine(Path.GetDirectoryName(sourceFilePath), Path.GetFileNameWithoutExtension(sourceFilePath) + statusFileExtension);
+                var sourceStatusFile = Path.Combine(Path.GetDirectoryName(sourceFilePath) ?? throw new InvalidOperationException(), Path.GetFileNameWithoutExtension(sourceFilePath) + statusFileExtension);
                 Delete(sourceStatusFile);
             }
         }
@@ -290,21 +247,13 @@ namespace RecurringIntegrationsScheduler.Common.Helpers
         /// <param name="sourceFilePath">Source file path</param>
         /// <param name="targetFilePath">Target file path</param>
         /// <returns>Boolean with operation result</returns>
-        public static bool Move(string sourceFilePath, string targetFilePath)
+        public static void Move(string sourceFilePath, string targetFilePath)
         {
-            try
+            if (File.Exists(targetFilePath))
             {
-                if (File.Exists(targetFilePath))
-                {
-                    File.Delete(targetFilePath);
-                }
-                File.Move(sourceFilePath, targetFilePath);
-                return true;
+                File.Delete(targetFilePath);
             }
-            catch
-            {
-                return false;
-            }
+            File.Move(sourceFilePath, targetFilePath);
         }
 
         /// <summary>
@@ -322,7 +271,7 @@ namespace RecurringIntegrationsScheduler.Common.Helpers
 
             using (var statusFileMemoryStream = new MemoryStream(Encoding.Default.GetBytes(statusData)))
             {
-                Create(statusFileMemoryStream, Path.Combine(Path.GetDirectoryName(dataMessage.FullPath), Path.GetFileNameWithoutExtension(dataMessage.FullPath) + statusFileExtension));
+                Create(statusFileMemoryStream, Path.Combine(Path.GetDirectoryName(dataMessage.FullPath) ?? throw new InvalidOperationException(), Path.GetFileNameWithoutExtension(dataMessage.FullPath) + statusFileExtension));
             }
         }
 
@@ -338,8 +287,8 @@ namespace RecurringIntegrationsScheduler.Common.Helpers
             {
                 return;
             }
-            var logFilePath = Path.Combine(Path.GetDirectoryName(targetDataMessage.FullPath), Path.GetFileNameWithoutExtension(targetDataMessage.FullPath) + statusFileExtension);
-            var logData = JsonConvert.SerializeObject(httpResponse, Newtonsoft.Json.Formatting.Indented, new StringEnumConverter());
+            var logFilePath = Path.Combine(Path.GetDirectoryName(targetDataMessage.FullPath) ?? throw new InvalidOperationException(), Path.GetFileNameWithoutExtension(targetDataMessage.FullPath) + statusFileExtension);
+            var logData = JsonConvert.SerializeObject(httpResponse, Formatting.Indented, new StringEnumConverter());
 
             using (var logMemoryStream = new MemoryStream(Encoding.Default.GetBytes(logData)))
             {
@@ -360,8 +309,8 @@ namespace RecurringIntegrationsScheduler.Common.Helpers
             {
                 return;
             }
-            var logFilePath = Path.Combine(Path.GetDirectoryName(targetDataMessage.FullPath), Path.GetFileNameWithoutExtension(targetDataMessage.FullPath) + statusFileExtension);
-            var logData = string.Empty;
+            var logFilePath = Path.Combine(Path.GetDirectoryName(targetDataMessage.FullPath) ?? throw new InvalidOperationException(), Path.GetFileNameWithoutExtension(targetDataMessage.FullPath) + statusFileExtension);
+            string logData;
 
             if (null != jobStatusDetail)
             {

@@ -292,3 +292,7 @@ __pycache__/
 /Setup/Quartz.Server.exe
 /Setup/Topshelf.dll
 /Recurring Integrations Scheduler Setup.exe
+/Setup/Quartz.Serialization.Json.dll
+/Setup/Quartz.Plugins.dll
+/Setup/Quartz.Jobs.dll
+/Setup/Quartz.dll

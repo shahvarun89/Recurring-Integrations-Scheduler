@@ -11,10 +11,11 @@ using System.IO;
 namespace RecurringIntegrationsScheduler.Common.JobSettings
 
 {
+    /// <inheritdoc />
     /// <summary>
     /// Serialize/deserialize download job settings
     /// </summary>
-    /// <seealso cref="RecurringIntegrationsScheduler.Common.Configuration.Settings" />
+    /// <seealso cref="N:RecurringIntegrationsScheduler.Common.JobSettings" />
     public class DownloadJobSettings : Settings
     {
         /// <summary>
@@ -32,10 +33,7 @@ namespace RecurringIntegrationsScheduler.Common.JobSettings
             var activityIdStr = dataMap.GetString(SettingsConstants.ActivityId);
             if (!Guid.TryParse(activityIdStr, out Guid activityIdGuid) || (Guid.Empty == activityIdGuid))
             {
-                throw new JobExecutionException(string.Format(CultureInfo.InvariantCulture,
-                    string.Format(
-                        Resources.Activity_Id_of_recurring_job_is_missing_or_is_not_a_GUID_in_job_configuration,
-                        context.JobDetail.Key)));
+                throw new JobExecutionException(string.Format(CultureInfo.InvariantCulture, Resources.Activity_Id_of_recurring_job_is_missing_or_is_not_a_GUID_in_job_configuration));
             }
             ActivityId = activityIdGuid;
 
@@ -48,17 +46,12 @@ namespace RecurringIntegrationsScheduler.Common.JobSettings
                 }
                 catch (Exception ex)
                 {
-                    throw new JobExecutionException(
-                        string.Format(CultureInfo.InvariantCulture,
-                            string.Format(Resources.Download_success_directory_does_not_exist_or_cannot_be_accessed,
-                                context.JobDetail.Key)), ex);
+                    throw new JobExecutionException(string.Format(CultureInfo.InvariantCulture, Resources.Download_success_directory_does_not_exist_or_cannot_be_accessed), ex);
                 }
             }
             else
             { 
-                throw new JobExecutionException(string.Format(CultureInfo.InvariantCulture,
-                    string.Format(Resources.Download_success_directory_is_missing_in_job_configuration,
-                        context.JobDetail.Key)));
+                throw new JobExecutionException(string.Format(CultureInfo.InvariantCulture, Resources.Download_success_directory_is_missing_in_job_configuration));
             }
 
             DownloadErrorsDir = dataMap.GetString(SettingsConstants.DownloadErrorsDir);
@@ -70,17 +63,12 @@ namespace RecurringIntegrationsScheduler.Common.JobSettings
                 }
                 catch (Exception ex)
                 {
-                    throw new JobExecutionException(
-                        string.Format(CultureInfo.InvariantCulture,
-                            string.Format(Resources.Download_errors_directory_does_not_exist_or_cannot_be_accessed,
-                                context.JobDetail.Key)), ex);
+                    throw new JobExecutionException(string.Format(CultureInfo.InvariantCulture, Resources.Download_errors_directory_does_not_exist_or_cannot_be_accessed), ex);
                 }
             }
             else
             {
-                throw new JobExecutionException(string.Format(CultureInfo.InvariantCulture,
-                    string.Format(Resources.Download_errors_directory_is_missing_in_job_configuration,
-                        context.JobDetail.Key)));
+                throw new JobExecutionException(string.Format(CultureInfo.InvariantCulture, Resources.Download_errors_directory_is_missing_in_job_configuration));
             }
 
             UnzipPackage = Convert.ToBoolean(dataMap.GetString(SettingsConstants.UnzipPackage));

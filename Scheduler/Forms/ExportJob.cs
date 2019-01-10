@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -40,6 +41,10 @@ namespace RecurringIntegrationsScheduler.Forms
         public IJobDetail JobDetail { get; set; }
         public ITrigger Trigger { get; set; }
 
+        private string exportToPackagePath;
+        private string getExecutionSummaryStatusPath;
+        private string getExportedPackageUrlPath;
+
         private void ExportJobForm_Load(object sender, EventArgs e)
         {
             Cancelled = false;
@@ -52,19 +57,19 @@ namespace RecurringIntegrationsScheduler.Forms
 
             jobGroupComboBox.DataSource = Properties.Settings.Default.JobGroups;
             jobGroupComboBox.ValueMember = null;
-            jobGroupComboBox.DisplayMember = Resources.Name;
+            jobGroupComboBox.DisplayMember = "Name";
 
             jobGroupComboBox.Enabled = JobDetail == null;
 
             instanceComboBox.DataSource = Properties.Settings.Default.Instances;
             instanceComboBox.ValueMember = null;
-            instanceComboBox.DisplayMember = Resources.Name;
+            instanceComboBox.DisplayMember = "Name";
 
             var applications = Properties.Settings.Default.AadApplications.Where(x => x.AuthenticationType == AuthenticationType.User);
             var applicationsBindingList = new BindingList<AadApplication>(applications.ToList());
             aadApplicationComboBox.DataSource = applicationsBindingList;
             aadApplicationComboBox.ValueMember = null;
-            aadApplicationComboBox.DisplayMember = Resources.Name;
+            aadApplicationComboBox.DisplayMember = "Name";
 
             userComboBox.DataSource = Properties.Settings.Default.Users;
             userComboBox.ValueMember = null;
@@ -73,6 +78,10 @@ namespace RecurringIntegrationsScheduler.Forms
             startAtDateTimePicker.Value = DateTime.Now;
 
             errorsFolder.Text = Properties.Settings.Default.DownloadErrorsFolder;
+
+            exportToPackagePath = OdataActionsConstants.ExportToPackageActionPath;
+            getExecutionSummaryStatusPath = OdataActionsConstants.GetExecutionSummaryStatusActionPath;
+            getExportedPackageUrlPath = OdataActionsConstants.GetExportedPackageUrlActionPath;
 
             if ((JobDetail != null) && (Trigger != null))
             {
@@ -150,7 +159,7 @@ namespace RecurringIntegrationsScheduler.Forms
                         applicationsBindingList = new BindingList<AadApplication>(applications.ToList());
                         aadApplicationComboBox.DataSource = applicationsBindingList;
                         aadApplicationComboBox.ValueMember = null;
-                        aadApplicationComboBox.DisplayMember = Resources.Name;
+                        aadApplicationComboBox.DisplayMember = "Name";
                     }
                     else
                     {
@@ -185,6 +194,10 @@ namespace RecurringIntegrationsScheduler.Forms
                 }
                 instanceComboBox.SelectedItem = axInstance;
 
+                pauseIndefinitelyCheckBox.Checked =
+                    (JobDetail.JobDataMap[SettingsConstants.IndefinitePause] != null) &&
+                    Convert.ToBoolean(JobDetail.JobDataMap[SettingsConstants.IndefinitePause].ToString());
+
                 if (Trigger.GetType() == typeof(SimpleTriggerImpl))
                 {
                     var localTrigger = (SimpleTriggerImpl) Trigger;
@@ -198,6 +211,22 @@ namespace RecurringIntegrationsScheduler.Forms
                     cronTriggerRadioButton.Checked = true;
                     cronExpressionTextBox.Text = localTrigger.CronExpressionString;
                 }
+                if(JobDetail.JobDataMap[SettingsConstants.RetryCount] != null)
+                {
+                    retriesCountUpDown.Value = Convert.ToDecimal(JobDetail.JobDataMap[SettingsConstants.RetryCount]);
+                }
+                if(JobDetail.JobDataMap[SettingsConstants.RetryDelay] != null)
+                {
+                    retriesDelayUpDown.Value = Convert.ToDecimal(JobDetail.JobDataMap[SettingsConstants.RetryDelay]);
+                }
+                pauseOnExceptionsCheckBox.Checked =
+                    (JobDetail.JobDataMap[SettingsConstants.PauseJobOnException] != null) &&
+                    Convert.ToBoolean(JobDetail.JobDataMap[SettingsConstants.PauseJobOnException].ToString());
+
+                exportToPackagePath = JobDetail.JobDataMap[SettingsConstants.ExportToPackageActionPath]?.ToString() ?? OdataActionsConstants.ExportToPackageActionPath;
+                getExecutionSummaryStatusPath = JobDetail.JobDataMap[SettingsConstants.GetExecutionSummaryStatusActionPath]?.ToString() ?? OdataActionsConstants.GetExecutionSummaryStatusActionPath;
+                getExportedPackageUrlPath = JobDetail.JobDataMap[SettingsConstants.GetExportedPackageUrlActionPath]?.ToString() ?? OdataActionsConstants.GetExportedPackageUrlActionPath;
+
                 Properties.Settings.Default.Save();
             }
         }
@@ -249,7 +278,7 @@ namespace RecurringIntegrationsScheduler.Forms
             if (JobDetail == null)
             {
                 var jobKey = new JobKey(jobName.Text, jobGroupComboBox.Text);
-                if (Scheduler.Instance.GetScheduler().CheckExists(jobKey))
+                if (Scheduler.Instance.GetScheduler().CheckExists(jobKey).Result)
                     if (
                         MessageBox.Show(
                             string.Format(Resources.Job_0_in_group_1_already_exists, jobKey.Name, jobKey.Group),
@@ -370,7 +399,14 @@ namespace RecurringIntegrationsScheduler.Forms
                 {SettingsConstants.DeletePackage, deletePackageCheckBox.Checked.ToString()},
                 {SettingsConstants.DataProject, dataProject.Text},
                 {SettingsConstants.Company, legalEntity.Text},
-                {SettingsConstants.Interval, (interval.Value * 1000).ToString()},
+                {SettingsConstants.Interval, (interval.Value * 1000).ToString(CultureInfo.InvariantCulture)},
+                {SettingsConstants.RetryCount, retriesCountUpDown.Value.ToString(CultureInfo.InvariantCulture)},
+                {SettingsConstants.RetryDelay, retriesDelayUpDown.Value.ToString(CultureInfo.InvariantCulture)},
+                {SettingsConstants.PauseJobOnException, pauseOnExceptionsCheckBox.Checked.ToString()},
+                {SettingsConstants.ExportToPackageActionPath, exportToPackagePath},
+                {SettingsConstants.GetExecutionSummaryStatusActionPath, getExecutionSummaryStatusPath},
+                {SettingsConstants.GetExportedPackageUrlActionPath, getExportedPackageUrlPath},
+                {SettingsConstants.IndefinitePause, pauseIndefinitelyCheckBox.Checked.ToString()}
             };
             if (serviceAuthRadioButton.Checked)
             {
@@ -469,9 +505,33 @@ namespace RecurringIntegrationsScheduler.Forms
             var applicationsBindingList = new BindingList<AadApplication>(applications.ToList());
             aadApplicationComboBox.DataSource = applicationsBindingList;
             aadApplicationComboBox.ValueMember = null;
-            aadApplicationComboBox.DisplayMember = Resources.Name;
+            aadApplicationComboBox.DisplayMember = "Name";
 
             userComboBox.Enabled = !serviceAuthRadioButton.Checked;
+        }
+
+        private void CustomActionsButton_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (ExportJobOptions form = new ExportJobOptions())
+                {
+                    form.ExportToPackagePath = exportToPackagePath;
+                    form.GetExecutionSummaryStatusPath = getExecutionSummaryStatusPath;
+                    form.GetExportedPackageUrlPath = getExportedPackageUrlPath;
+                    form.ShowDialog();
+
+                    if (form.Cancelled) return;
+
+                    exportToPackagePath = form.ExportToPackagePath;
+                    getExecutionSummaryStatusPath = form.GetExecutionSummaryStatusPath;
+                    getExportedPackageUrlPath = form.GetExportedPackageUrlPath;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, Resources.Unexpected_error);
+            }
         }
     }
 }

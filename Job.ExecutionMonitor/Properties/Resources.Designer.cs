@@ -19,7 +19,7 @@ namespace RecurringIntegrationsScheduler.Job.Properties {
     // class via a tool like ResGen or Visual Studio.
     // To add or remove a member, edit your .ResX file then rerun ResGen
     // with the /str option, or rebuild your VS project.
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "4.0.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "15.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     internal class Resources {
@@ -133,6 +133,24 @@ namespace RecurringIntegrationsScheduler.Job.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Job: {0}. Retrying HTTP operation. Exception : {1}.
+        /// </summary>
+        internal static string Job_0_Retrying_Http_operation_Exception_1 {
+            get {
+                return ResourceManager.GetString("Job_0_Retrying_Http_operation_Exception_1", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Job: {0}. Retrying IO operation. Exception : {1}.
+        /// </summary>
+        internal static string Job_0_Retrying_IO_operation_Exception_1 {
+            get {
+                return ResourceManager.GetString("Job_0_Retrying_IO_operation_Exception_1", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Job: {0} starting....
         /// </summary>
         internal static string Job_0_starting {
@@ -151,11 +169,29 @@ namespace RecurringIntegrationsScheduler.Job.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Job: {0} was paused because of error.
+        ///   Looks up a localized string similar to Job: {0} thrown an error. Exception : {1}.
+        /// </summary>
+        internal static string Job_0_thrown_an_error_1 {
+            get {
+                return ResourceManager.GetString("Job_0_thrown_an_error_1", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Job: {0} was paused because of an error..
         /// </summary>
         internal static string Job_0_was_paused_because_of_error {
             get {
                 return ResourceManager.GetString("Job_0_was_paused_because_of_error", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Job: {0} was paused indefinitely..
+        /// </summary>
+        internal static string Job_0_was_paused_indefinitely {
+            get {
+                return ResourceManager.GetString("Job_0_was_paused_indefinitely", resourceCulture);
             }
         }
     }

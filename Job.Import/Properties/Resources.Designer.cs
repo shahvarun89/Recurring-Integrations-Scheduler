@@ -142,6 +142,43 @@ namespace RecurringIntegrationsScheduler.Job.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Job: {0} Package template contains input file: {1}. Please remove it from the template..
+        /// </summary>
+        internal static string Job_0_Package_template_contains_input_file_1_Please_remove_it_from_the_template {
+            get {
+                return ResourceManager.GetString("Job_0_Package_template_contains_input_file_1_Please_remove_it_from_the_template", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Job: {0} Please check your package template. Input file name in Manifest cannot be identified..
+        /// </summary>
+        internal static string Job_0_Please_check_your_package_template_Input_file_name_in_Manifest_cannot_be_identified {
+            get {
+                return ResourceManager.GetString("Job_0_Please_check_your_package_template_Input_file_name_in_Manifest_cannot_be_id" +
+                        "entified", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Job: {0}. Retrying HTTP operation. Exception : {1}.
+        /// </summary>
+        internal static string Job_0_Retrying_Http_operation_Exception_1 {
+            get {
+                return ResourceManager.GetString("Job_0_Retrying_Http_operation_Exception_1", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Job: {0}. Retrying IO operation. Exception : {1}.
+        /// </summary>
+        internal static string Job_0_Retrying_IO_operation_Exception_1 {
+            get {
+                return ResourceManager.GetString("Job_0_Retrying_IO_operation_Exception_1", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Job: {0} starting....
         /// </summary>
         internal static string Job_0_starting {
@@ -156,6 +193,15 @@ namespace RecurringIntegrationsScheduler.Job.Properties {
         internal static string Job_0_Target_directory_for_status_log_file_was_not_specified {
             get {
                 return ResourceManager.GetString("Job_0_Target_directory_for_status_log_file_was_not_specified", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Job: {0} thrown an error. Exception : {1}.
+        /// </summary>
+        internal static string Job_0_thrown_an_error_1 {
+            get {
+                return ResourceManager.GetString("Job_0_thrown_an_error_1", resourceCulture);
             }
         }
         
@@ -178,7 +224,7 @@ namespace RecurringIntegrationsScheduler.Job.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Job: {0} was paused because of error.
+        ///   Looks up a localized string similar to Job: {0} was paused because of an error..
         /// </summary>
         internal static string Job_0_was_paused_because_of_error {
             get {
@@ -187,11 +233,11 @@ namespace RecurringIntegrationsScheduler.Job.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Package template contains input file: {0}. Please remove it from the template..
+        ///   Looks up a localized string similar to Job: {0} was paused indefinitely..
         /// </summary>
-        internal static string Package_template_contains_input_file_0_Please_remove_it_from_the_template {
+        internal static string Job_0_was_paused_indefinitely {
             get {
-                return ResourceManager.GetString("Package_template_contains_input_file_0_Please_remove_it_from_the_template", resourceCulture);
+                return ResourceManager.GetString("Job_0_was_paused_indefinitely", resourceCulture);
             }
         }
     }

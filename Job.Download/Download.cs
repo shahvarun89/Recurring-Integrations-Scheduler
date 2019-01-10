@@ -1,8 +1,9 @@
 ﻿/* Copyright (c) Microsoft Corporation. All rights reserved.
    Licensed under the MIT License. */
 
-using Common.Logging;
+using log4net;
 using Newtonsoft.Json;
+using Polly;
 using Quartz;
 using RecurringIntegrationsScheduler.Common.Contracts;
 using RecurringIntegrationsScheduler.Common.Helpers;
@@ -13,6 +14,7 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Threading.Tasks;
 
 namespace RecurringIntegrationsScheduler.Job
@@ -20,15 +22,14 @@ namespace RecurringIntegrationsScheduler.Job
     /// <summary>
     /// Job that uses enqueue/dequeue API to download exported data from D365FO
     /// </summary>
-    /// <seealso cref="Quartz.IJob" />
+    /// <seealso cref="IJob" />
     [DisallowConcurrentExecution]
     public class Download : IJob
     {
         /// <summary>
         /// The log
         /// </summary>
-        private static readonly ILog Log = LogManager.GetLogger(typeof(Download));
-
+        private static readonly ILog Log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
         /// <summary>
         /// The settings
         /// </summary>
@@ -63,11 +64,21 @@ namespace RecurringIntegrationsScheduler.Job
         private ConcurrentQueue<DataMessage> DownloadQueue { get; set; }
 
         /// <summary>
+        /// Retry policy for IO operations
+        /// </summary>
+        private Policy _retryPolicyForIo;
+
+        /// <summary>
+        /// Retry policy for HTTP operations
+        /// </summary>
+        private Policy _retryPolicyForHttp;
+
+        /// <summary>
         /// Called by the <see cref="T:Quartz.IScheduler" /> when a <see cref="T:Quartz.ITrigger" />
         /// fires that is associated with the <see cref="T:Quartz.IJob" />.
         /// </summary>
         /// <param name="context">The execution context.</param>
-        /// <exception cref="Quartz.JobExecutionException">false</exception>
+        /// <exception cref="JobExecutionException">false</exception>
         /// <remarks>
         /// The implementation may wish to set a  result object on the
         /// JobExecutionContext before this method exits.  The result itself
@@ -76,38 +87,77 @@ namespace RecurringIntegrationsScheduler.Job
         /// <see cref="T:Quartz.ITriggerListener" />s that are watching the job's
         /// execution.
         /// </remarks>
-        public void Execute(IJobExecutionContext context)
+        public async Task Execute(IJobExecutionContext context)
         {
             try
             {
+                log4net.Config.XmlConfigurator.Configure();
                 _context = context;
                 _settings.Initialize(context);
 
-                Log.DebugFormat(CultureInfo.InvariantCulture, string.Format(Resources.Job_0_starting, _context.JobDetail.Key));
+                if (_settings.IndefinitePause)
+                {
+                    await context.Scheduler.PauseJob(context.JobDetail.Key);
+                    Log.InfoFormat(CultureInfo.InvariantCulture,
+                        string.Format(Resources.Job_0_was_paused_indefinitely, _context.JobDetail.Key));
+                    return;
+                }
 
-                var t = Task.Run(Process);
-                t.Wait();
+                _retryPolicyForIo = Policy.Handle<IOException>().WaitAndRetry(
+                    retryCount: _settings.RetryCount, 
+                    sleepDurationProvider: attempt => TimeSpan.FromSeconds(_settings.RetryDelay),
+                    onRetry: (exception, calculatedWaitDuration) => 
+                    {
+                        Log.WarnFormat(CultureInfo.InvariantCulture, string.Format(Resources.Job_0_Retrying_IO_operation_Exception_1, _context.JobDetail.Key, exception.Message));
+                    });
+                _retryPolicyForHttp = Policy.Handle<HttpRequestException>().WaitAndRetryAsync(
+                    retryCount: _settings.RetryCount, 
+                    sleepDurationProvider: attempt => TimeSpan.FromSeconds(_settings.RetryDelay),
+                    onRetry: (exception, calculatedWaitDuration) => 
+                    {
+                        Log.WarnFormat(CultureInfo.InvariantCulture, string.Format(Resources.Job_0_Retrying_Http_operation_Exception_1, _context.JobDetail.Key, exception.Message));
+                    });
 
-                Log.DebugFormat(CultureInfo.InvariantCulture, string.Format(Resources.Job_0_ended, _context.JobDetail.Key));
+                if (Log.IsDebugEnabled)
+                    Log.DebugFormat(CultureInfo.InvariantCulture, string.Format(Resources.Job_0_starting, _context.JobDetail.Key));
+
+                await Process();
+
+                if (Log.IsDebugEnabled)
+                    Log.DebugFormat(CultureInfo.InvariantCulture, string.Format(Resources.Job_0_ended, _context.JobDetail.Key));
             }
             catch (Exception ex)
             {
-                //Pause this job
-                context.Scheduler.PauseJob(context.JobDetail.Key);
-                Log.WarnFormat(CultureInfo.InvariantCulture, string.Format(Resources.Job_0_was_paused_because_of_error, _context.JobDetail.Key));
-
-                if (!string.IsNullOrEmpty(ex.Message))
-                    Log.Error(ex.Message, ex);
-
-                while (ex.InnerException != null)
+                if (_settings.PauseJobOnException)
                 {
-                    if (!string.IsNullOrEmpty(ex.InnerException.Message))
-                        Log.Error(ex.InnerException.Message, ex.InnerException);
-
-                    ex = ex.InnerException;
+                    await context.Scheduler.PauseJob(context.JobDetail.Key);
+                    Log.WarnFormat(CultureInfo.InvariantCulture,
+                        string.Format(Resources.Job_0_was_paused_because_of_error, _context.JobDetail.Key));
                 }
-                if (context.Scheduler.SchedulerName != "Private")
+                if (Log.IsDebugEnabled)
+                {
+                    if (!string.IsNullOrEmpty(ex.Message))
+                    {
+                        Log.Error(ex.Message, ex);
+                    }
+                    else
+                    {
+                        Log.Error("Uknown exception", ex);
+                    }
+
+                    while (ex.InnerException != null)
+                    {
+                        if (!string.IsNullOrEmpty(ex.InnerException.Message))
+                            Log.Error(ex.InnerException.Message, ex.InnerException);
+
+                        ex = ex.InnerException;
+                    }
+                }
+                if (context.Scheduler.SchedulerName != "Private")//only throw error when running as service
                     throw new JobExecutionException(string.Format(Resources.Download_job_0_failed, _context.JobDetail.Key), ex, false);
+
+                if (!Log.IsDebugEnabled)
+                    Log.Error(string.Format(Resources.Job_0_thrown_an_error_1, _context.JobDetail.Key, ex.Message));
             }
         }
 
@@ -118,7 +168,7 @@ namespace RecurringIntegrationsScheduler.Job
         private async Task Process()
         {
             DownloadQueue = new ConcurrentQueue<DataMessage>();
-            _httpClientHelper = new HttpClientHelper(_settings);
+            _httpClientHelper = new HttpClientHelper(_settings, _retryPolicyForHttp);
             _dequeueUri = _httpClientHelper.GetDequeueUri();
             _acknowledgeDownloadUri = _httpClientHelper.GetAckUri();
 
@@ -146,16 +196,16 @@ namespace RecurringIntegrationsScheduler.Job
 
                         DownloadQueue.Enqueue(dataMessage);
 
-                        Log.DebugFormat(CultureInfo.InvariantCulture, string.Format(Resources.Job_0_File_dequeued_successfully_Download_location_1, _context.JobDetail.Key, dataMessage.DownloadLocation));
+                        if (Log.IsDebugEnabled)
+                            Log.DebugFormat(CultureInfo.InvariantCulture, string.Format(Resources.Job_0_File_dequeued_successfully_Download_location_1, _context.JobDetail.Key, dataMessage.DownloadLocation));
                         break;
                     case HttpStatusCode.NoContent:
                         contentPresent = false;
                         break;
                     default:
                         // Dequeue failed. Log error.
-                        Log.ErrorFormat(CultureInfo.InvariantCulture, string.Format(Resources.Job_0_Failure_response_Status_1_2_Reason_3, _context.JobDetail.Key, response.StatusCode, response.StatusCode, response.ReasonPhrase));
-                        contentPresent = false;
-                        break;
+                        throw new JobExecutionException(string.Format(CultureInfo.InvariantCulture, string.Format(Resources.Job_0_Failure_response_Status_1_2_Reason_3, _context.JobDetail.Key, response.StatusCode, response.StatusCode, response.ReasonPhrase)));
+                        
                 }
                 System.Threading.Thread.Sleep(_settings.Interval);
             }
@@ -185,7 +235,7 @@ namespace RecurringIntegrationsScheduler.Job
                 if (!response.IsSuccessStatusCode)
                     throw new Exception(string.Format(Resources.Job_0_Download_failure_1, _context.JobDetail.Key, response.StatusCode));
 
-                using (Stream downloadedStream = await response.Content.ReadAsStreamAsync())
+                using (var downloadedStream = await response.Content.ReadAsStreamAsync())
                 {
                     fileCount++;
                     //Downloaded file has no file name. We need to create it.
@@ -197,15 +247,15 @@ namespace RecurringIntegrationsScheduler.Job
                     dataMessage.Name = fileName;
                     dataMessage.MessageStatus = MessageStatus.Succeeded;
 
-                    FileOperationsHelper.Create(downloadedStream, dataMessage.FullPath);
+                    _retryPolicyForIo.Execute(() => FileOperationsHelper.Create(downloadedStream, dataMessage.FullPath));
                 }
-
-                Log.DebugFormat(CultureInfo.InvariantCulture, string.Format(Resources.Job_0_File_1_was_downloaded, _context.JobDetail.Key, dataMessage.FullPath.Replace(@"{", @"{{").Replace(@"}", @"}}")));
+                if (Log.IsDebugEnabled)
+                    Log.DebugFormat(CultureInfo.InvariantCulture, string.Format(Resources.Job_0_File_1_was_downloaded, _context.JobDetail.Key, dataMessage.FullPath.Replace(@"{", @"{{").Replace(@"}", @"}}")));
 
                 await AcknowledgeDownload(dataMessage);
 
                 if (_settings.UnzipPackage)
-                    FileOperationsHelper.UnzipPackage(dataMessage.FullPath, _settings.DeletePackage, _settings.AddTimestamp);
+                    _retryPolicyForIo.Execute(() => FileOperationsHelper.UnzipPackage(dataMessage.FullPath, _settings.DeletePackage, _settings.AddTimestamp));
 
                 System.Threading.Thread.Sleep(_settings.Interval);
             }
@@ -224,7 +274,8 @@ namespace RecurringIntegrationsScheduler.Job
 
             if (response.StatusCode == HttpStatusCode.OK)
             {
-                Log.DebugFormat(CultureInfo.InvariantCulture, string.Format(Resources.Job_0_File_1_was_acknowledged_successfully, _context.JobDetail.Key, dataMessage.FullPath.Replace(@"{", @"{{").Replace(@"}", @"}}")));
+                if (Log.IsDebugEnabled)
+                    Log.DebugFormat(CultureInfo.InvariantCulture, string.Format(Resources.Job_0_File_1_was_acknowledged_successfully, _context.JobDetail.Key, dataMessage.FullPath.Replace(@"{", @"{{").Replace(@"}", @"}}")));
             }
             else
             {
@@ -232,7 +283,7 @@ namespace RecurringIntegrationsScheduler.Job
                 Log.ErrorFormat(CultureInfo.InvariantCulture, string.Format(Resources.Job_0_Acknowledgment_failure_response, _context.JobDetail.Key, response.StatusCode, response.StatusCode, response.ReasonPhrase));
 
                 // Move message file
-                FileOperationsHelper.Move(dataMessage.FullPath, Path.Combine(_settings.DownloadErrorsDir, dataMessage.Name));
+                _retryPolicyForIo.Execute(() => FileOperationsHelper.Move(dataMessage.FullPath, Path.Combine(_settings.DownloadErrorsDir, dataMessage.Name)));
             }
         }
     }
